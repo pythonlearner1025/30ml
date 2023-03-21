@@ -5,7 +5,7 @@
 ### Paper 1: Backprop by Hinton (March 20)
 
 Concept: Backprop & Autograd\
-Link: https://www.iro.umontreal.ca/~vincentp/ift3395/lectures/backprop_old.pdf\
+Link: https://www.iro.umontreal.ca/~vincentp/ift3395/lectures/backprop_old.pdf \
 Implementation: MLP trained on MNIST dataset using backprop & vanilla grad descent
 
 ### Paper 2: ResNet (March 27)
