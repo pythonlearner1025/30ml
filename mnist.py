@@ -32,15 +32,6 @@ def test_accuracy(X: np.ndarray, y: np.ndarray, nn) -> tuple[np.ndarray, float]:
                         c+=1
                     break
         return c
-    '''
-    Compute the label and error rate.
-    :param X: input data
-    :param y: label
-    :param nn: neural network class
-    :return:
-    labels: predicted labels
-    error_rate: prediction error rate
-    '''
     y_pred = nn(X)
     #print('test')
     b = np.zeros_like(y_pred)
@@ -49,6 +40,7 @@ def test_accuracy(X: np.ndarray, y: np.ndarray, nn) -> tuple[np.ndarray, float]:
     #print(y)
     corr = matches(b, y)
     return to_labels(b), (corr / len(y))
+
 
 if __name__ == '__main__':
     train = '/Users/minjunes/30ml/mnist/data/train.csv'

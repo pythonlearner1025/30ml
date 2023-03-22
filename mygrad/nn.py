@@ -1,37 +1,6 @@
 import numpy as np
 import math
 
-class Tensor:
-    def __init__(self, val):
-        self.val = val
-        self.grad = None
-        self.backward = None
-    
-    def __repr__(self):
-        return f'{self.val}'
-
-    # how to save backward op for both    
-    # c = a * b 
-    # dc/da = b
-    # dc/db = a 
-    def __mul__(self, tensor):
-        new = Tensor(self.val * tensor.val)
-        def backward():
-            print(self, tensor)
-            self.grad = tensor.val 
-            tensor.grad = self.val
-        new.backward = backward
-        return new
-    
-    def __add__(self, tensor):
-        new = Tensor(self.val + tensor.val)
-        def backward():
-            print(self, tensor)
-            self.grad = 0
-            tensor.grad = 0
-        new.backward = backward
-        return new
-
 class Sigmoid:
     def __init__(self):
         self.a = None

@@ -1,4 +1,5 @@
 **/.DS_Store
 **/.csv
+**/.ipynb_checkpoints
 data/**/*.csv
 mygrad/__pycache__/
