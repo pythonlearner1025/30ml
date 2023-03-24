@@ -11,4 +11,4 @@ if __name__ == '__main__':
     print(type(z))
     print(z)
 
-    z.backward(debug=True)
+    z.backward()

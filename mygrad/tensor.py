@@ -17,7 +17,7 @@ class Function:
 
     @classmethod
     def apply(fn, *x, **kwargs):
-        # initialize custom fn
+        # initialize custom fn. ctx is object of custom function!
         ctx = fn(*x)
         # do forward pass on custom fn, return new val
         ret = Tensor(ctx.forward(*[t.data for t in x], **kwargs), 
@@ -55,56 +55,29 @@ class Tensor:
     def __truediv__(self, x): return mlops.Div.apply(self,x)
     def __matmul__(self, x): return mlops.Matmul.apply(self, x)
 
-    # toy example, let's assume computational graph is 
-    # z1 = x1 @ w1 
-    # z2 = x2 @ w2
-    # z3 = z1 + z2 
-    # and we call zw.backward()
-    def backward(self, debug=False):
-        # implicit
-        grads = [np.ones(self.data.shape)]
-        nodes = self.deepwalk()
-        # grad descent
-        i = 0
-        logger = []
-        while i < len(nodes):
-            logger.append('*'*50)
-            logger.append(f'iter: {i}')
-            logger.append(f'grads: {grads}')
-            n_grads = len(grads)
-            if not n_grads: break 
-            children = nodes[i:i+n_grads]
-            logger.append(f'children: {children}')
-            newgrads = []
-            for child,grad in zip(children,grads):
-                logger.append(f'child: {child}, grad: {grad}')
-                if child._ctx:
-                    newgrad = [*child._ctx.backward(grad)]
-                    newgrads.extend(newgrad)
-                    logger.append(f'newgrad: {newgrad}')
-            grads = newgrads
-            i+=n_grads
-
-        if debug:
-            for log in logger:
-                print(log)
-
-        self.nodes = nodes
+    # seconda pass impl
+    def backward(self):
+        self.grad = Tensor(np.ones(self.data.shape), requires_grad=False)
+        self.nodes = reversed(self.deepwalk())
+        for node in self.nodes:
+            grads = node._ctx.backward(node.grad.data)
+            grads = [Tensor(g, requires_grad=False) if g is not None else None \
+                for g in ([grads] if len(node._ctx.parents)==1 else grads)]
+            for n, g in zip(node._ctx.parents, grads):
+                if g is not None and n.requires_grad:
+                    n.grad = g if n.grad is None else (n.grad + g)
         return self.nodes
 
-    # return all nodes... without order 
+    # second pass impl
     def deepwalk(self):
-        nodes = [self]
-        checked = set()
-        for node in nodes:
-            if node in checked:
-                continue
-            checked.add(node)
+        def _deepwalk(node, visited, graph):
+            visited.add(node)
             if node._ctx:
-                parents = node._ctx.parents
-                for parent in parents:
-                    nodes.append(parent)
-        return nodes
+                for n in node._ctx.parents:
+                    if n not in visited: _deepwalk(n,visited,graph)
+                graph.append(node)
+            return graph
+        return _deepwalk(self, set(), [])
 
     def _step(self,lr):
         self.data -= lr*self.grad
