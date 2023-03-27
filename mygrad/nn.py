@@ -191,8 +191,8 @@ class CNN:
        self.conv2 = ConvLayer(self.conv1.out_size,kernel_size,stride,zero_pad)
        self.conv3 = ConvLayer(self.conv2.out_size,kernel_size,stride,zero_pad)
        # maxpool
-       self.linear1 = Layer((self.conv3.out_size//2)**2, 128)
-       self.linear2 = Layer(128,10)
+       self.linear1 = Layer((self.conv3.out_size//2)**2,196)
+       self.linear2 = Layer(196,10)
     
     def __call__(self,x): return self.forward(x)
     

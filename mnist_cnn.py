@@ -28,9 +28,9 @@ if __name__ == '__main__':
     X_train,Y_train = np.array(X).astype(np.float32)[:train_split], np.array(Y).astype(np.float32)[:train_split]
     X_test,Y_test = np.array(X).astype(np.float32)[train_split:], np.array(Y).astype(np.float32)[train_split:]
 
-    epoch_count = 5000
+    epoch_count = 10000
     batch_n = 32
-    initial_learning_rate = 1e-5
+    initial_learning_rate = 1e-4
     decay_rate = 1*3
     decay_step = epoch_count // 2
     reg_strength = 1e-4

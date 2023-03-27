@@ -126,6 +126,7 @@ class ZeroPad(Function):
         return grad[:, p:-p, p:-p]
 
 # this is fixed under stride = 1
+# TODO: make stride a parameter
 class Convolve(Function):
     # x = input, y = kernels 
     def forward(self,x,y):
