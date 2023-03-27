@@ -2,44 +2,8 @@ import csv
 import random
 import numpy as np
 from mygrad.nn import *
+from mygrad.utils import *
 from itertools import islice
-
-def one_hot(hot, size):
-    res = [0] * size
-    res[int(hot)] = 1
-    return res
-
-def loss(y,p):
-    return (y*np.log(p)).sum()/len(y)
-
-def highest(L):
-    res = []
-    for i in range(len(L)):
-        res.append(L[i].index(max(L[i])))
-    return res 
-
-def to_labels(b):
-    idx = np.where(b==1)[1]
-    return idx
-
-def test_accuracy(X: np.ndarray, y: np.ndarray, nn) -> tuple[np.ndarray, float]:
-    def matches(y, y_pred):
-        c = 0
-        for i in range(len(y)):
-            for j in range(len(y[0])):
-                if y[i][j] == 1:
-                    if y_pred[i][j] == 1: 
-                        c+=1
-                    break
-        return c
-    y_pred = nn(X)
-    #print('test')
-    b = np.zeros_like(y_pred)
-    b[np.arange(len(y_pred)), y_pred.argmax(1)] = 1
-    #print(b)
-    #print(y)
-    corr = matches(b, y)
-    return to_labels(b), (corr / len(y))
 
 
 if __name__ == '__main__':
