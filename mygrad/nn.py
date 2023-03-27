@@ -54,6 +54,7 @@ class OldLayer:
 
 # TODO: automate this 
 class OldMLP:
+
     def __init__(self, input_size, h1_size, h2_size, h3_size, output_size, lr):
         self.input_layer = Layer(input_size, h1_size, lr)
         self.h1 = Layer(h1_size, h2_size, lr)
@@ -100,27 +101,57 @@ class OldMLP:
         self.h1.step(n)
         self.input_layer.step(n)
 
-'''
-class Layer:
-    def __init__(self, input_size, output_size):
-        w = np.random.uniform(-0.03, 0.03, (input_size, output_size)).astype(np.float32)
-        w = np.vstack([w, np.ones((1, output_size))])
-        self.w = Tensor(w, requires_grad=True, requires_update=True)
 
-    def __call__(self, x: Tensor): return self.forward(x)
+# plan for CNN impl of MNIST
 
-    def forward(self, x: Tensor)-> Tensor:
-        x = x.add_bias()
-        #print('forward')
-        #print(self.w.shape, self.w.requires_update)
-        z = x @ self.w
-        #print('z')
-        #print(z.shape)
-        #print(z._ctx)
-        #print(z.requires_grad)
-      #  if (z._ctx): print([p.shape for p in z._ctx.parents])
+# X (Bx28x28)
+# Z1 = Conv(X, kernel_size=5, stride=1, zero_pad=2) (Bx28x28)
+# Z2 = Conv(Z1,...) (Bx28x28)
+# Z3 = Conv(Z2,...) (Bx28x28)
+# Z4 = MaxPool(Z3) (Bx7x7)
+# Z4 reshape (Bx49)
+# H1 = Layer(Z4)
+# H2 = Layer(H2)
+# S = Softmax(H2)
+# L = CEL(S, Y)
+
+class ConvLayer:
+    def __init__(self, input_size, kernel_size, stride, zero_pad):
+        self.out_size=int(((input_size-kernel_size)+2*zero_pad)/stride+1)
+        W = np.random.normal(0, np.sqrt(2/(kernel_size*2)),size=(self.out_size**2, kernel_size, kernel_size))
+        self.kernel = Tensor(W, requires_grad=True, requires_update=True)
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.zero_pad = zero_pad
+
+    def __call__(self,x): return self.forward(x) 
+
+    def forward(self,x:Tensor):
+        B,_,_ = x.shape
+        # x = BxSxS
+        # we want x = Bx576xKxK
+        x = x.zeropad(self.zero_pad)
+        z = x.convolve(self.kernel).reshape(
+            B, self.out_size, self.out_size)
         return z
-'''
+
+    ''' 
+        naive implementation would be to loop through
+        a total of 24x24=576 distinct kernels that can be fit
+        into the 28x28 input image and place their values
+        into a zero-matrix (assuming zero_pad = 0)
+
+        but how to do this parallel, at once? 
+        can I make an matrix of size 576x5x5 that
+        is equivalent to distinct input regions respective kernels
+        will seee and matrix multiply it with kernels of size
+        576x5x5? And then, scalar sum all of their values to get
+        576x1 and reshape it to "activation map" 24x24? Sounds like a plan.
+
+        derivative for forward and backward convolution process
+
+    '''
+
 class Layer:
     def __init__(self, input_size, output_size):
         # xavier activation#
@@ -138,11 +169,10 @@ class Layer:
         z += self.b.repeat(z.shape[0], axis=0)
         return z
 
-# TODO: automate this 
 class MLP:
     def __init__(self, sizes):
         self.layers = [Layer(sizes[i],sizes[i+1]) for i in range(len(sizes)) if i != len(sizes)-1]
-        print('layers count: ', len(self.layers))
+        #print('layers count: ', len(self.layers))
     
     def __call__(self,x): return self.forward(x)
     
@@ -154,7 +184,29 @@ class MLP:
             else:
                 x = z.softmax()
         return x
+
+class CNN:
+    def __init__(self,input_size,kernel_size,stride,zero_pad):
+       self.conv1 = ConvLayer(input_size,kernel_size,stride,zero_pad)
+       self.conv2 = ConvLayer(self.conv1.out_size,kernel_size,stride,zero_pad)
+       self.conv3 = ConvLayer(self.conv2.out_size,kernel_size,stride,zero_pad)
+       # maxpool
+       self.linear1 = Layer((self.conv3.out_size//2)**2, 128)
+       self.linear2 = Layer(128,10)
     
+    def __call__(self,x): return self.forward(x)
+    
+    def forward(self, x:Tensor):
+        z1 = self.conv1(x)
+        z2 = self.conv2(z1)
+        z3 = self.conv3(z2)
+        z4 = z3.maxpool().flatten().relu()
+        z5 = self.linear1(z4).relu()
+        s = self.linear2(z5).softmax()
+        return s
+
 
 
         
+
+

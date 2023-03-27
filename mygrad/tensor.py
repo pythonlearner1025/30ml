@@ -15,7 +15,7 @@ def pprint(x, name):
 class Function:
     def __init__(self, *tensors):
         self.parents = tensors
-        self.inputs_need_grad = [t.requires_grad for t in tensors]
+        self.inputs_need_grad = [t.requires_grad for t in tensors if isinstance(t, Tensor)]
         self.requires_grad = True if any(self.inputs_need_grad) else False #else (None if any(x is None for x in self.inputs_need_grad) else False)
 
     @classmethod
@@ -23,7 +23,7 @@ class Function:
         # initialize custom fn. ctx is object of custom function!
         ctx = cls(*x)
         # do forward pass on custom fn, return new val
-        ret = Tensor(ctx.forward(*[t.data for t in x], **kwargs), 
+        ret = Tensor(ctx.forward(*[t.data if isinstance(t, Tensor) else t for t in x], **kwargs), 
             requires_grad=ctx.requires_grad)
         # it is needed for backprop and the mode is not inference
         if ctx.requires_grad and not Tensor.no_grad: ret._ctx = ctx
@@ -58,6 +58,8 @@ class Tensor:
     def __setitem__(self, index, value):
         self.data[index] = value
 
+    # binary ops
+
     def __add__(self, x): 
         if not isinstance(x, Tensor):
             x = Tensor(x)
@@ -83,10 +85,6 @@ class Tensor:
             x = Tensor(x)
         return mlops.Matmul.apply(self, x)
 
-    def sum(self, axis=1, keepdims=True): return Tensor(self.data.sum(axis=axis, keepdims=keepdims))
-    def log(self): return Tensor(np.log(self.data))
-    def exp(self): return Tensor(np.exp(self.data))
-    
     def relu(self):
         out = mlops.ReLU.apply(self)
         return out
@@ -102,15 +100,29 @@ class Tensor:
         out = mlops.CrossEntropyLoss.apply(self,x)
         return out
 
+    # unary ops
+    def sum(self, axis=1, keepdims=True): return Tensor(self.data.sum(axis=axis, keepdims=keepdims))
+    def log(self): return Tensor(np.log(self.data))
+    def exp(self): return Tensor(np.exp(self.data))
     def argmax(self,x): return Tensor(self.data.argmax(x))
     def repeat(self, dim, axis=0): 
-        return Tensor(
+        out = Tensor(
             self.data.repeat(dim, axis=axis),
             requires_grad=self.requires_grad,
-            requires_update=self.requires_update
+            requires_update=self.requires_update,
             )
-    # TODO: movement operation should be done 
-    def add_bias(self): return mlops.Bias.apply(self)
+        # is this ok?
+        out._ctx = self._ctx
+        out.grad = self.grad
+        return out
+    def reshape(self, *args): return Tensor(self.data.reshape(*args))
+    # binary cnn mlops
+    def convolve(self,x):return mlops.Convolve.apply(self,x)
+    def maxpool(self):return mlops.MaxPool.apply(self)
+
+    # binary movement ops
+    def zeropad(self,p):return mlops.ZeroPad.apply(self,p)
+    def flatten(self):return mlops.Flatten.apply(self)
 
     def backward(self):
         self.grad = Tensor(np.ones(self.data.shape), requires_grad=False)

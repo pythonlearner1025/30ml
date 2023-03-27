@@ -112,3 +112,83 @@ class Bias(Function):
     
     def backward(self, grad):
         return grad[:,:-1]
+
+class ZeroPad(Function):
+    def forward(self, x, p):
+        self.p = p
+        #print(x.shape)
+        B,W,H = x.shape
+        z = np.zeros((B,W+2*p,H+2*p))
+        z[:,p:-p, p:-p] = x
+        return z
+    def backward(self, grad):
+        p = self.p
+        return grad[:, p:-p, p:-p]
+
+# this is fixed under stride = 1
+class Convolve(Function):
+    # x = input, y = kernels 
+    def forward(self,x,y):
+        self.x, self.y = x,y
+        D,K,K = y.shape
+        B,W,H = x.shape
+        assert(W==H)
+        spread = np.zeros((B,D,K,K))
+        for i in range(W-K):
+            for j in range(H-K):
+                spread[:,i*(W-K)+j] = x[:,i:i+K,j:j+K]
+        self.spread = spread
+        self.ret = (spread * y).sum(axis=(-2,-1))
+        assert(self.ret.shape == (B,D))
+        return self.ret
+
+    def backward(self,grad):
+        '''
+         DL w.r.t to x, w.r.t to y
+         for dLdx it would be grad*self.y, but not in shape B,D,K,K
+         but in shape B,W,H. 
+         this is because there are many overlapping input neurons
+         that contribute to a single activation neurons, and thus 
+         their contribution must be "aggregated" by overlaying
+         the kernels over zero array of size B,W,H again but with += this time.
+        '''
+        D,K,K = self.y.shape
+        B,W,H = self.x.shape
+        mat = np.zeros(self.x.shape)
+        for i in range(W-K):
+            for j in range(H-K):
+                mat[:,i:i+K, j:j+K] += self.y[i*(W-K)+j]
+        return grad*mat if self.inputs_need_grad[0] else None,\
+            grad*self.spread if self.inputs_need_grad[1] else None
+
+class MaxPool(Function):
+    def forward(self,x):
+        self.x = x
+        B,W,H = x.shape
+        mat = np.zeros((B,W//2,H//2))
+        for i in range(W//2):
+            for j in range(H//2):
+                mat[:,i,j] = x[:,i*2:i*2+2,j*2:j*2+2].sum(axis=(-1,-2))
+        return mat
+
+    def backward(self,grad):
+        mat = np.zeros(self.x.shape)
+        B,W,H = grad.shape
+        for i in range(W):
+            for j in range(H):
+                mat[:,i*2:i*2+2,j*2:j*2+2]+=np.ones((2,2))*grad[:,i,j] 
+        return grad * mat
+
+# TODO: i need reshape operator for gradients in between 
+# conv and linear
+
+class Flatten(Function):
+    def forward(self,x):
+        B,W,H = x.shape
+        self.prev_shape = B,W,H
+        return x.reshape(B,W*H)
+    
+    def backward(self,grad):
+        B,W,H = self.prev_shape
+        return grad.reshape(B,W,H)
+        
