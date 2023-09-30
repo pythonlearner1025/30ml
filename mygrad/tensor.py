@@ -14,7 +14,7 @@ def pprint(x, name):
 
 class Function:
     def __init__(self, *tensors):
-        self.parents = tensors
+        self.parents = [t for t in tensors if isinstance(t,Tensor)]
         self.inputs_need_grad = [t.requires_grad for t in tensors if isinstance(t, Tensor)]
         self.requires_grad = True if any(self.inputs_need_grad) else False #else (None if any(x is None for x in self.inputs_need_grad) else False)
 
@@ -117,7 +117,7 @@ class Tensor:
         return out
     def reshape(self, *args): return Tensor(self.data.reshape(*args))
     # binary cnn mlops
-    def convolve(self,x):return mlops.Convolve.apply(self,x)
+    def convolve(self,x,S):return mlops.Convolve.apply(self,x,S)
     def maxpool(self):return mlops.MaxPool.apply(self)
 
     # binary movement ops

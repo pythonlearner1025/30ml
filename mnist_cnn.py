@@ -55,7 +55,7 @@ if __name__ == '__main__':
     for i in range(epoch_count):
         idxs = np.random.permutation(len(X_train))[:batch_n]
         x,y = Tensor(X_train[idxs, :]), Tensor(Y_train[idxs, :])
-        y_preds = cnn(minmax(x).reshape(len(x),28,28))
+        y_preds = cnn(minmax(x).reshape(len(x),1,28,28))
         loss = y_preds.cross_entropy_loss(y)
         lr = optim.step(loss, i)
 

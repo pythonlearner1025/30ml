@@ -3,3 +3,6 @@
 **/.ipynb_checkpoints
 data/**/*.csv
 mygrad/__pycache__/
+weights/
+data/
+__pycache__/

@@ -41,7 +41,7 @@ def test_accuracy(X: Tensor, y: Tensor, nn) -> tuple[np.ndarray, float]:
                         c+=1
                     break
         return c
-    y_pred = nn(minmax(X).reshape(len(X),28,28))
+    y_pred = nn(minmax(X).reshape(len(X),1,28,28))
     #print('test')
     b = np.zeros_like(y_pred)
     b[np.arange(len(y_pred)), y_pred.argmax(1)] = 1

@@ -117,79 +117,95 @@ class ZeroPad(Function):
     def forward(self, x, p):
         self.p = p
         #print(x.shape)
-        B,W,H = x.shape
-        z = np.zeros((B,W+2*p,H+2*p))
-        z[:,p:-p, p:-p] = x
+        B,C,W,H = x.shape
+        z = np.zeros((B,C,W+2*p,H+2*p))
+        z[:,:,p:-p, p:-p] = x
         return z
     def backward(self, grad):
         p = self.p
-        return grad[:, p:-p, p:-p]
+        return grad[:,:,p:-p, p:-p]
 
-# this is fixed under stride = 1
-# TODO: make stride a parameter
 class Convolve(Function):
     # x = input, y = kernels 
-    def forward(self,x,y):
-        self.x, self.y = x,y
-        D,K,K = y.shape
-        B,W,H = x.shape
-        assert(W==H)
-        spread = np.zeros((B,D,K,K))
-        for i in range(W-K):
-            for j in range(H-K):
-                spread[:,i*(W-K)+j] = x[:,i:i+K,j:j+K]
-        self.spread = spread
-        self.ret = (spread * y).sum(axis=(-2,-1))
-        assert(self.ret.shape == (B,D))
-        return self.ret
+    def forward(self,img,kernel,S):
+        self.img, self.kernel, self.S = img, kernel, S
+        F,C,K,K = self.kernel.shape
+        B,C,W,H, = self.img.shape
+        out_size = int((W-K)/S+1)
+        out = np.zeros((B,F,out_size,out_size))
+        def conv(x,y):
+            #print(x.shape)
+            #print(y.shape)
+            B,W,H = x.shape
+            K,K = y.shape
+            out = np.zeros((B,out_size,out_size))
+            for i in range(out_size):
+                for j in range(out_size):
+                    out[:,i,j] = (x[:,S*i:S*i+K,S*j:S*j+K]*y).sum(axis=(-2,-1))
+            return out
+
+        for i in range(F):
+            for j in range(C):
+                out[:,i] += conv(img[:,j], kernel[i,j])
+        self.out = out
+        return out 
 
     def backward(self,grad):
         '''
-         DL w.r.t to x, w.r.t to y
-         for dLdx it would be grad*self.y, but not in shape B,D,K,K
-         but in shape B,W,H. 
-         this is because there are many overlapping input neurons
-         that contribute to a single activation neurons, and thus 
-         their contribution must be "aggregated" by overlaying
-         the kernels over zero array of size B,W,H again but with += this time.
+         grad shape = B,F,O,O
+         1. DLdx B,C,W,H
+         grad * self.kernel 
+         2. DLdy F,C,K,K
+         grad * self.img
         '''
-        D,K,K = self.y.shape
-        B,W,H = self.x.shape
-        mat = np.zeros(self.x.shape)
-        for i in range(W-K):
-            for j in range(H-K):
-                mat[:,i:i+K, j:j+K] += self.y[i*(W-K)+j]
-        return grad*mat if self.inputs_need_grad[0] else None,\
-            grad*self.spread if self.inputs_need_grad[1] else None
+        # grad shape = B,F,O,O
+        
+        S = self.S
+        F,C,K,K = self.kernel.shape
+        B,C,W,H = self.img.shape
+        mat = np.zeros((B,C,W,H))
+        mat2 = np.zeros((F,C,K,K))
+        out_size = int(((W-K)/S)+1)
+        assert(out_size == grad.shape[-1])
+        for i in range(F):
+            for j in range(C):
+                for k in range(out_size):
+                    for l in range(out_size):
+                        # TODO: fix                       # 32,1,1,1          1,5,5 
+                        mat[:,j,S*k:S*k+K,S*l:S*l+K] += grad[:,i,j,k].reshape(B,1,1,1)*self.kernel[i,j].reshape(1,K,K)
+                        mat2[i,j] += grad[:,i,j,k]*self.img[:,j,S*k:S*k+K,S*l:S*l+K]
+
+        return mat if self.inputs_need_grad[0] else None,\
+             mat2 if self.inputs_need_grad[1] else None
 
 class MaxPool(Function):
     def forward(self,x):
         self.x = x
-        B,W,H = x.shape
-        mat = np.zeros((B,W//2,H//2))
-        for i in range(W//2):
-            for j in range(H//2):
-                mat[:,i,j] = x[:,i*2:i*2+2,j*2:j*2+2].sum(axis=(-1,-2))
+        B,C,W,H = x.shape
+        mat = np.zeros((B,C,W//2,H//2))
+        for j in range(W//2):
+            for k in range(H//2):
+                mat[:,:,j,k] = x[:,:,j*2:j*2+2,k*2:k*2+2].sum(axis=(-1,-2))
         return mat
 
     def backward(self,grad):
+        B,C,W,H = grad.shape
         mat = np.zeros(self.x.shape)
-        B,W,H = grad.shape
-        for i in range(W):
-            for j in range(H):
-                mat[:,i*2:i*2+2,j*2:j*2+2]+=np.ones((2,2))*grad[:,i,j] 
-        return grad * mat
+        for j in range(W):
+            for k in range(H):
+                mat[:,:,j*2:j*2+2,k*2:k*2+2] = np.ones((B,C,2,2))*grad[:,:,j,k].reshape(B,C,1,1) 
+        return mat
 
 # TODO: i need reshape operator for gradients in between 
 # conv and linear
 
 class Flatten(Function):
     def forward(self,x):
-        B,W,H = x.shape
-        self.prev_shape = B,W,H
-        return x.reshape(B,W*H)
+        B,C,W,H = x.shape
+        self.x = B,C,W,H
+        return x.reshape(B,C*W*H)
     
     def backward(self,grad):
-        B,W,H = self.prev_shape
-        return grad.reshape(B,W,H)
+        B,C,W,H = self.x
+        return grad.reshape(B,C,W,H)
         
