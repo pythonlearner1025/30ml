@@ -5,6 +5,29 @@ from itertools import islice
 import numpy as np
 import csv
 
+'''
+import torch
+from torch.utils.data import Dataset
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+import matplotlib.pyplot as plt
+
+
+training_data = datasets.FashionMNIST(
+    root="data",
+    train=True,
+    download=True,
+    transform=ToTensor()
+)
+
+test_data = datasets.FashionMNIST(
+    root="data",
+    train=False,
+    download=True,
+    transform=ToTensor()
+)
+'''
+
 # TODO: more ops in Tensor, like shape, ones, rand, and mlops
 # autograd works, at least naively without real mlops
 if __name__ == '__main__':
